@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Копирование ссылки на подписку</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: var(--tg-theme-bg-color, #ffffff);
+            color: var(--tg-theme-text-color, #000000);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            text-align: center;
+            max-width: 400px;
+            width: 100%;
+        }
+        
+        .icon {
+            font-size: 64px;
+            margin-bottom: 20px;
+        }
+        
+        h1 {
+            font-size: 24px;
+            margin-bottom: 10px;
+            color: var(--tg-theme-text-color, #000000);
+        }
+        
+        .message {
+            font-size: 16px;
+            margin-bottom: 30px;
+            color: var(--tg-theme-hint-color, #999999);
+        }
+        
+        .subscription-link {
+            background: var(--tg-theme-secondary-bg-color, #f0f0f0);
+            border-radius: 8px;
+            padding: 15px;
+            margin: 20px 0;
+            word-break: break-all;
+            font-family: monospace;
+            font-size: 12px;
+            color: var(--tg-theme-text-color, #000000);
+            user-select: all;
+            -webkit-user-select: all;
+            -moz-user-select: all;
+            -ms-user-select: all;
+        }
+        
+        .button {
+            background: var(--tg-theme-button-color, #3390ec);
+            color: var(--tg-theme-button-text-color, #ffffff);
+            border: none;
+            border-radius: 8px;
+            padding: 12px 24px;
+            font-size: 16px;
+            font-weight: 500;
+            cursor: pointer;
+            width: 100%;
+            margin-top: 20px;
+        }
+        
+        .button:hover {
+            opacity: 0.9;
+        }
+        
+        .button:active {
+            opacity: 0.8;
+        }
+        
+        .success {
+            color: #4caf50;
+            font-weight: 500;
+        }
+        
+        .error {
+            color: #f44336;
+            font-weight: 500;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="icon">📋</div>
+        <h1 id="title">Копирование ссылки...</h1>
+        <p class="message" id="message">Пожалуйста, подождите</p>
+        <div class="subscription-link" id="subscriptionLink" style="display: none;"></div>
+        <button class="button" id="copyButton" style="display: none;">Скопировать еще раз</button>
+        <button class="button" id="openAppButton" style="display: none; margin-top: 10px; background: var(--tg-theme-button-color, #3390ec);">Открыть приложение</button>
+    </div>
+
+    <script>
+        // Инициализация Telegram Web App
+        let tg = null;
+        if (window.Telegram && window.Telegram.WebApp) {
+            tg = window.Telegram.WebApp;
+            try {
+                tg.ready();
+                tg.expand();
+                console.log('Telegram Web App initialized');
+            } catch (e) {
+                console.error('Error initializing Telegram Web App:', e);
+            }
+        } else {
+            // Если не в Telegram, пытаемся использовать как обычную веб-страницу
+            console.log('Not running in Telegram Web App - will use standard clipboard API');
+        }
+
+        // Получаем ссылку из URL параметров
+        const urlParams = new URLSearchParams(window.location.search);
+        const subscriptionUrl = urlParams.get('url');
+        const appType = urlParams.get('app') || 'iphone'; // iphone, android, windows
+
+        const titleEl = document.getElementById('title');
+        const messageEl = document.getElementById('message');
+        const subscriptionLinkEl = document.getElementById('subscriptionLink');
+        const copyButtonEl = document.getElementById('copyButton');
+        const openAppButtonEl = document.getElementById('openAppButton');
+
+        // Deep links для разных приложений
+        const appDeepLinks = {
+            iphone: 'happplus://', // Нужно уточнить реальную схему
+            android: 'v2rayng://', // Нужно уточнить реальную схему
+            windows: 'v2rayn://' // Нужно уточнить реальную схему
+        };
+
+        // Функция копирования в буфер обмена
+        async function copyToClipboard(text) {
+            try {
+                // Приоритет 1: Используем Telegram Web App API если доступен
+                if (tg && typeof tg.copyText === 'function') {
+                    try {
+                        tg.copyText(text);
+                        // Telegram API не возвращает промис, но обычно работает
+                        return true;
+                    } catch (e) {
+                        console.log('Telegram copyText failed, trying fallback:', e);
+                    }
+                }
+                
+                // Приоритет 2: Стандартный Clipboard API (работает в HTTPS)
+                if (navigator.clipboard && navigator.clipboard.writeText) {
+                    try {
+                        await navigator.clipboard.writeText(text);
+                        return true;
+                    } catch (e) {
+                        console.log('Clipboard API failed, trying fallback:', e);
+                    }
+                }
+                
+                // Приоритет 3: Fallback для старых браузеров
+                try {
+                    const textArea = document.createElement('textarea');
+                    textArea.value = text;
+                    textArea.style.position = 'fixed';
+                    textArea.style.top = '0';
+                    textArea.style.left = '0';
+                    textArea.style.width = '2em';
+                    textArea.style.height = '2em';
+                    textArea.style.padding = '0';
+                    textArea.style.border = 'none';
+                    textArea.style.outline = 'none';
+                    textArea.style.boxShadow = 'none';
+                    textArea.style.background = 'transparent';
+                    textArea.style.opacity = '0';
+                    document.body.appendChild(textArea);
+                    textArea.focus();
+                    textArea.select();
+                    
+                    // Для мобильных устройств
+                    if (document.execCommand) {
+                        const success = document.execCommand('copy');
+                        document.body.removeChild(textArea);
+                        return success;
+                    }
+                    
+                    document.body.removeChild(textArea);
+                } catch (e) {
+                    console.log('execCommand failed:', e);
+                }
+                
+                return false;
+            } catch (err) {
+                console.error('Ошибка копирования:', err);
+                return false;
+            }
+        }
+
+        // Функция открытия приложения
+        function openApp() {
+            const deepLink = appDeepLinks[appType];
+            if (deepLink) {
+                // Пытаемся открыть приложение через deep link
+                window.location.href = deepLink;
+                
+                // Если приложение не открылось, показываем инструкцию
+                setTimeout(() => {
+                    messageEl.innerHTML = 'Если приложение не открылось, откройте его вручную и вставьте ссылку из буфера обмена';
+                }, 1000);
+            } else {
+                messageEl.innerHTML = 'Откройте приложение вручную и вставьте ссылку из буфера обмена';
+            }
+        }
+
+        // Основная логика
+        if (subscriptionUrl) {
+            subscriptionLinkEl.textContent = subscriptionUrl;
+            subscriptionLinkEl.style.display = 'block';
+            
+            // Показываем кнопки сразу
+            titleEl.textContent = '📋 Скопируйте ссылку';
+            messageEl.textContent = 'Нажмите кнопку ниже, чтобы скопировать ссылку в буфер обмена:';
+            copyButtonEl.style.display = 'block';
+            openAppButtonEl.style.display = 'block';
+            
+            // Пытаемся автоматически скопировать только через Telegram Web App API
+            // (он не требует пользовательского взаимодействия)
+            if (tg && typeof tg.copyText === 'function') {
+                setTimeout(() => {
+                    try {
+                        tg.copyText(subscriptionUrl);
+                        titleEl.textContent = '✅ Ссылка скопирована!';
+                        titleEl.className = 'success';
+                        messageEl.textContent = 'Ссылка на подписку скопирована в буфер обмена. Теперь откройте приложение и вставьте её.';
+                        messageEl.className = 'success';
+                        console.log('Auto-copy successful via Telegram Web App');
+                    } catch (e) {
+                        console.log('Auto-copy failed, user will need to click button:', e);
+                        // Оставляем исходное сообщение с кнопкой - не показываем ошибку
+                    }
+                }, 500);
+            } else {
+                console.log('Telegram Web App API not available, user must click button');
+                // Не показываем ошибку, просто показываем кнопку
+            }
+
+            // Обработчики кнопок
+            copyButtonEl.addEventListener('click', async (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                
+                console.log('Copy button clicked, attempting to copy:', subscriptionUrl);
+                const success = await copyToClipboard(subscriptionUrl);
+                console.log('Copy result:', success);
+                
+                if (success) {
+                    titleEl.textContent = '✅ Ссылка скопирована!';
+                    titleEl.className = 'success';
+                    messageEl.textContent = 'Ссылка на подписку скопирована в буфер обмена. Теперь откройте приложение и вставьте её.';
+                    messageEl.className = 'success';
+                } else {
+                    // Если кнопка не работает, делаем ссылку кликабельной для ручного копирования
+                    titleEl.textContent = '📋 Коснитесь ссылки';
+                    messageEl.textContent = 'Коснитесь ссылки ниже, чтобы скопировать её вручную:';
+                    messageEl.className = '';
+                    subscriptionLinkEl.style.cursor = 'pointer';
+                    subscriptionLinkEl.style.userSelect = 'all';
+                    subscriptionLinkEl.style.backgroundColor = 'var(--tg-theme-button-color, #3390ec)';
+                    subscriptionLinkEl.style.color = 'var(--tg-theme-button-text-color, #ffffff)';
+                    subscriptionLinkEl.style.padding = '10px';
+                    subscriptionLinkEl.style.borderRadius = '8px';
+                    
+                    // Удаляем старый обработчик если есть и добавляем новый
+                    const oldHandler = subscriptionLinkEl.onclick;
+                    subscriptionLinkEl.onclick = function() {
+                        this.select();
+                        try {
+                            if (document.execCommand('copy')) {
+                                messageEl.textContent = '✅ Ссылка скопирована!';
+                                messageEl.className = 'success';
+                                titleEl.textContent = '✅ Готово!';
+                                titleEl.className = 'success';
+                            }
+                        } catch (err) {
+                            console.error('Manual copy failed:', err);
+                        }
+                    };
+                }
+            });
+
+            openAppButtonEl.addEventListener('click', openApp);
+        } else {
+            titleEl.textContent = '❌ Ошибка';
+            titleEl.className = 'error';
+            messageEl.textContent = 'Ссылка на подписку не найдена. Пожалуйста, вернитесь в бота и попробуйте снова.';
+        }
+    </script>
+</body>
+</html>
+
