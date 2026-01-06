@@ -101,7 +101,6 @@
         <p class="message" id="message">Пожалуйста, подождите</p>
         <div class="subscription-link" id="subscriptionLink" style="display: none;"></div>
         <button class="button" id="copyButton" style="display: none;">Скопировать еще раз</button>
-        <button class="button" id="openAppButton" style="display: none; margin-top: 10px; background: var(--tg-theme-button-color, #3390ec);">📱 Показать инструкцию</button>
     </div>
 
     <script>
@@ -124,43 +123,11 @@
         // Получаем ссылку из URL параметров
         const urlParams = new URLSearchParams(window.location.search);
         const subscriptionUrl = urlParams.get('url');
-        const appType = urlParams.get('app') || 'iphone'; // iphone, android, windows
 
         const titleEl = document.getElementById('title');
         const messageEl = document.getElementById('message');
         const subscriptionLinkEl = document.getElementById('subscriptionLink');
         const copyButtonEl = document.getElementById('copyButton');
-        const openAppButtonEl = document.getElementById('openAppButton');
-
-        // Определяем тип устройства
-        const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
-        const isAndroid = /Android/.test(navigator.userAgent);
-        const isMac = /Macintosh/.test(navigator.userAgent);
-        const isWindows = /Windows/.test(navigator.userAgent);
-        
-        // Определяем какое приложение нужно открыть
-        let targetApp = 'iphone'; // по умолчанию
-        if (isIOS || isMac) {
-            targetApp = 'iphone';
-        } else if (isAndroid) {
-            targetApp = 'android';
-        } else if (isWindows) {
-            targetApp = 'windows';
-        }
-        
-        // Deep links для разных приложений (могут не работать, так как VPN приложения обычно не поддерживают deep links)
-        const appDeepLinks = {
-            iphone: null, // HAPP Plus не поддерживает deep links
-            android: null, // v2rayNG не поддерживает deep links для открытия
-            windows: null // v2rayN не поддерживает deep links
-        };
-        
-        // Ссылки на приложения в магазинах
-        const appStoreLinks = {
-            iphone: 'https://apps.apple.com/ru/app/happ-proxy-utility-plus/id6746188973',
-            android: 'https://github.com/2dust/v2rayNG',
-            windows: 'https://github.com/2dust/v2rayN'
-        };
 
         // Функция копирования в буфер обмена
         async function copyToClipboard(text) {
@@ -221,56 +188,6 @@
             } catch (err) {
                 console.error('Ошибка копирования:', err);
                 return false;
-            }
-        }
-
-        // Функция открытия приложения
-        function openApp() {
-            const currentApp = appType || targetApp;
-            const deepLink = appDeepLinks[currentApp];
-            const storeLink = appStoreLinks[currentApp];
-            
-            // Показываем инструкцию
-            let instruction = '';
-            if (currentApp === 'iphone') {
-                instruction = '📱 Инструкция для iPhone/Mac:\n\n1. Откройте приложение HAPP Proxy Utility Plus\n2. Нажмите на ➕ в правом верхнем углу\n3. Выберите "Вставить из буфера обмена"\n4. Подключитесь к VPN';
-            } else if (currentApp === 'android') {
-                instruction = '📱 Инструкция для Android:\n\n1. Откройте приложение v2rayNG\n2. Нажмите на ➕ в правом верхнем углу\n3. Выберите "Вставить из буфера обмена"\n4. Подключитесь к VPN';
-            } else {
-                instruction = '💻 Инструкция для Windows/Linux:\n\n1. Откройте приложение v2rayN\n2. Нажмите на ➕ в правом верхнем углу\n3. Выберите "Вставить из буфера обмена"\n4. Подключитесь к VPN';
-            }
-            
-            // Пытаемся открыть приложение через deep link (если доступен)
-            if (deepLink) {
-                try {
-                    window.location.href = deepLink;
-                    // Показываем инструкцию через секунду
-                    setTimeout(() => {
-                        messageEl.innerHTML = instruction.replace(/\n/g, '<br>');
-                        titleEl.textContent = '📱 Откройте приложение';
-                    }, 500);
-                } catch (e) {
-                    messageEl.innerHTML = instruction.replace(/\n/g, '<br>');
-                    titleEl.textContent = '📱 Откройте приложение';
-                }
-            } else {
-                // Если deep link недоступен, просто показываем инструкцию
-                messageEl.innerHTML = instruction.replace(/\n/g, '<br>');
-                titleEl.textContent = '📱 Откройте приложение';
-                
-                // Добавляем ссылку на скачивание приложения, если его нет
-                if (storeLink) {
-                    const downloadLink = document.createElement('a');
-                    downloadLink.href = storeLink;
-                    downloadLink.target = '_blank';
-                    downloadLink.textContent = 'Скачать приложение';
-                    downloadLink.style.display = 'block';
-                    downloadLink.style.marginTop = '10px';
-                    downloadLink.style.color = 'var(--tg-theme-button-color, #3390ec)';
-                    downloadLink.style.textDecoration = 'underline';
-                    messageEl.appendChild(document.createElement('br'));
-                    messageEl.appendChild(downloadLink);
-                }
             }
         }
 
@@ -373,7 +290,6 @@
                 }
             });
 
-            // Кнопка инструкции больше не нужна - приложение закрывается после копирования
         } else {
             titleEl.textContent = '❌ Ошибка';
             titleEl.className = 'error';
