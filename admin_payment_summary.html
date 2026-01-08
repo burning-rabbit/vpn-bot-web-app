@@ -137,7 +137,7 @@
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
             <h1 style="margin: 0;">📋 Сводка по истекающим подпискам</h1>
             <div style="font-size: 12px; color: var(--tg-theme-hint-color, #999999); padding: 4px 8px; background: var(--tg-theme-secondary-bg-color, #f0f0f0); border-radius: 4px;">
-                v1.0.1
+                v1.1.0
             </div>
         </div>
         <div class="count" id="userCount">Загрузка...</div>
@@ -178,13 +178,28 @@
         
         console.log('='.repeat(60));
 
-        const APP_VERSION = "1.0.1";
+        const APP_VERSION = "1.1.0";
         let usersData = [];
         const confirmedUsers = new Set();
         
         // Log version on load
         console.log(`Admin Payment Summary v${APP_VERSION}`);
 
+        // Get API server URL from URL parameters or use default
+        function getApiServerUrl() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const apiUrl = urlParams.get('api_url');
+            if (apiUrl) {
+                return apiUrl.replace(/\/$/, ''); // Remove trailing slash
+            }
+            // Default: try to detect from current location (for localhost testing)
+            // In production, this should be passed as URL parameter
+            return 'http://localhost:5000';
+        }
+        
+        const API_SERVER_URL = getApiServerUrl();
+        console.log('API Server URL:', API_SERVER_URL);
+        
         // Get data from URL parameters
         function getDataFromURL() {
             const urlParams = new URLSearchParams(window.location.search);
@@ -294,39 +309,54 @@
             console.log('Prepared data:', data);
             console.log('Data as JSON:', JSON.stringify(data));
 
-            try {
-                if (!tg) {
-                    throw new Error('Telegram WebApp object is not initialized');
+            // Send HTTP request to API server
+            console.log('Sending request to:', `${API_SERVER_URL}/api/confirm_payment`);
+            fetch(`${API_SERVER_URL}/api/confirm_payment`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(data)
+            })
+            .then(response => {
+                console.log('Response status:', response.status);
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
                 }
+                return response.json();
+            })
+            .then(result => {
+                console.log('API Response:', result);
                 
-                if (typeof tg.sendData !== 'function') {
-                    throw new Error('tg.sendData is not a function');
+                if (result.success) {
+                    // Mark as confirmed
+                    confirmedUsers.add(telegramUserId);
+                    
+                    if (button) {
+                        button.classList.add('confirmed');
+                        button.textContent = '✅ Подтверждено';
+                    }
+                    
+                    console.log('Payment confirmation completed');
+                    
+                    // Show success message
+                    if (result.message) {
+                        alert(`✅ ${result.message}`);
+                    }
+                } else {
+                    throw new Error(result.error || 'Unknown error');
                 }
-                
-                console.log('Calling tg.sendData...');
-                tg.sendData(JSON.stringify(data));
-                console.log('tg.sendData called successfully');
-                
-                // Mark as confirmed
-                confirmedUsers.add(telegramUserId);
-                
-                if (button) {
-                    button.classList.add('confirmed');
-                    button.textContent = '✅ Подтверждено';
-                }
-                
-                console.log('Payment confirmation completed');
-            } catch (e) {
-                console.error('ERROR in confirmPayment:', e);
-                console.error('Error name:', e.name);
-                console.error('Error message:', e.message);
-                console.error('Error stack:', e.stack);
+            })
+            .catch(error => {
+                console.error('ERROR in confirmPayment:', error);
+                console.error('Error name:', error.name);
+                console.error('Error message:', error.message);
                 if (button) {
                     button.disabled = false;
                     button.textContent = '✅ Подтвердить оплату';
-                    alert('Ошибка при отправке данных: ' + e.message + '. Проверьте консоль для деталей.');
+                    alert('Ошибка при отправке данных: ' + error.message + '. Проверьте консоль для деталей.');
                 }
-            }
+            });
         }
 
         // Initialize
