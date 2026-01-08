@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Сводка по истекающим подпискам</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: var(--tg-theme-bg-color, #ffffff);
+            color: var(--tg-theme-text-color, #000000);
+            padding: 16px;
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        
+        .header h1 {
+            font-size: 24px;
+            margin-bottom: 8px;
+        }
+        
+        .header .count {
+            font-size: 16px;
+            color: var(--tg-theme-hint-color, #999999);
+        }
+        
+        .user-card {
+            background: var(--tg-theme-secondary-bg-color, #f0f0f0);
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 12px;
+        }
+        
+        .user-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+        
+        .user-info {
+            flex: 1;
+        }
+        
+        .user-name {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+        
+        .user-id {
+            font-size: 14px;
+            color: var(--tg-theme-hint-color, #999999);
+        }
+        
+        .user-stats {
+            display: flex;
+            gap: 16px;
+            margin-bottom: 12px;
+            font-size: 14px;
+        }
+        
+        .stat-item {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+        
+        .devices-list {
+            margin-top: 12px;
+            padding-top: 12px;
+            border-top: 1px solid var(--tg-theme-hint-color, #e0e0e0);
+        }
+        
+        .device-item {
+            font-size: 14px;
+            padding: 6px 0;
+            color: var(--tg-theme-hint-color, #666666);
+        }
+        
+        .confirm-button {
+            width: 100%;
+            padding: 12px;
+            background: var(--tg-theme-button-color, #0088cc);
+            color: var(--tg-theme-button-text-color, #ffffff);
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            margin-top: 12px;
+            transition: opacity 0.2s;
+        }
+        
+        .confirm-button:hover {
+            opacity: 0.9;
+        }
+        
+        .confirm-button:active {
+            opacity: 0.8;
+        }
+        
+        .confirm-button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        
+        .confirm-button.confirmed {
+            background: #4caf50;
+        }
+        
+        .empty-state {
+            text-align: center;
+            padding: 40px 20px;
+            color: var(--tg-theme-hint-color, #999999);
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: var(--tg-theme-hint-color, #999999);
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>📋 Сводка по истекающим подпискам</h1>
+        <div class="count" id="userCount">Загрузка...</div>
+    </div>
+    
+    <div id="usersContainer">
+        <div class="loading">Загрузка данных...</div>
+    </div>
+
+    <script>
+        const tg = window.Telegram.WebApp;
+        tg.ready();
+        tg.expand();
+
+        let usersData = [];
+        const confirmedUsers = new Set();
+
+        // Get data from URL parameters
+        function getDataFromURL() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const dataParam = urlParams.get('data');
+            
+            if (dataParam) {
+                try {
+                    const decoded = atob(dataParam);
+                    const parsed = JSON.parse(decoded);
+                    return parsed.users || [];
+                } catch (e) {
+                    console.error('Error parsing data:', e);
+                    return [];
+                }
+            }
+            
+            return [];
+        }
+
+        // Load users data
+        usersData = getDataFromURL();
+
+        function renderUsers() {
+            const container = document.getElementById('usersContainer');
+            const countEl = document.getElementById('userCount');
+            
+            if (usersData.length === 0) {
+                container.innerHTML = '<div class="empty-state">Нет пользователей с истекающими подписками</div>';
+                countEl.textContent = 'Найдено: 0';
+                return;
+            }
+            
+            countEl.textContent = `Найдено: ${usersData.length}`;
+            
+            container.innerHTML = usersData.map((user, index) => {
+                const isConfirmed = confirmedUsers.has(user.telegram_user_id);
+                const devicesList = user.devices.map(device => 
+                    `<div class="device-item">• ${device.device_name} (${device.email})</div>`
+                ).join('');
+                
+                return `
+                    <div class="user-card">
+                        <div class="user-header">
+                            <div class="user-info">
+                                <div class="user-name">${user.username || 'Без username'}</div>
+                                <div class="user-id">ID: ${user.telegram_user_id}</div>
+                            </div>
+                        </div>
+                        <div class="user-stats">
+                            <div class="stat-item">
+                                <span>📱</span>
+                                <span>${user.devices_count} устройств(а)</span>
+                            </div>
+                            <div class="stat-item">
+                                <span>💰</span>
+                                <span>${user.amount} руб.</span>
+                            </div>
+                        </div>
+                        <div class="devices-list">
+                            ${devicesList}
+                        </div>
+                        <button 
+                            class="confirm-button ${isConfirmed ? 'confirmed' : ''}" 
+                            data-user-id="${user.telegram_user_id}"
+                            data-username="${user.username || ''}"
+                            ${isConfirmed ? 'disabled' : ''}
+                            onclick="confirmPayment(${user.telegram_user_id}, '${user.username || ''}')"
+                        >
+                            ${isConfirmed ? '✅ Подтверждено' : '✅ Подтвердить оплату'}
+                        </button>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function confirmPayment(telegramUserId, username) {
+            if (confirmedUsers.has(telegramUserId)) {
+                return;
+            }
+
+            const button = document.querySelector(`button[data-user-id="${telegramUserId}"]`);
+            if (button) {
+                button.disabled = true;
+                button.textContent = '⏳ Обработка...';
+            }
+
+            // Send data to bot
+            const data = {
+                action: 'confirm_payment',
+                telegram_user_id: telegramUserId
+            };
+
+            try {
+                tg.sendData(JSON.stringify(data));
+                
+                // Mark as confirmed
+                confirmedUsers.add(telegramUserId);
+                
+                if (button) {
+                    button.classList.add('confirmed');
+                    button.textContent = '✅ Подтверждено';
+                }
+            } catch (e) {
+                console.error('Error sending data:', e);
+                if (button) {
+                    button.disabled = false;
+                    button.textContent = '✅ Подтвердить оплату';
+                    alert('Ошибка при отправке данных. Попробуйте еще раз.');
+                }
+            }
+        }
+
+        // Initialize
+        renderUsers();
+    </script>
+</body>
+</html>
